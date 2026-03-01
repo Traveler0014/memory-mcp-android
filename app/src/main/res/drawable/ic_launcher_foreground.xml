@@ -1,0 +1,20 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.127"
+        android:scaleY="0.127"
+        android:translateX="2.6"
+        android:translateY="8.2">
+        <!-- Circle/Main Body -->
+        <path
+            android:fillColor="@color/icon_logo_crimson"
+            android:pathData="M 313.70117,268.3457 A 162.51969,162.51969 0 0 0 151.18164,430.86523 162.51969,162.51969 0 0 0 313.70117,593.38672 162.51969,162.51969 0 0 0 475.61719,442.91211 H 437.82227 A 124.72441,124.72441 0 0 1 313.70117,555.58984 124.72441,124.72441 0 0 1 188.97656,430.86523 124.72441,124.72441 0 0 1 313.70117,306.14258 124.72441,124.72441 0 0 1 365.2793,317.44141 l 18.92382,-32.7793 A 162.51969,162.51969 0 0 0 313.70117,268.3457 Z" />
+        <!-- Triangle Detail -->
+        <path
+            android:fillColor="@color/icon_logo_white"
+            android:pathData="M 487.55859,129.73438 313.70117,430.86523 h 347.7168 z m 0,75.5957 108.39258,187.74023 H 379.16602 Z" />
+    </group>
+</vector>

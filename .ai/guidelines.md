@@ -37,7 +37,31 @@ Retrieval:
 2.  Perform a linear scan using Cosine Similarity.
 3.  Math: $similarity = \frac{A \cdot B}{\|A\|\|B\|}$. Since BGE vectors are often normalized, a simple Dot Product may suffice.
 
-### 3.3 Communication: Streamable HTTP (NDJSON)
+### 3.3 MCP Interface Definition (The "Standard Five")
+
+To ensure a closed-loop memory lifecycle, the following five tools must be implemented:
+
+1. memorize(content: String, tags: List<String>?) -> id: Int
+
+    Logic: Generate embedding -> Store content + vector + tags -> Return primary key ID.
+
+2. recall(query: String, limit: Int, tags: List<String>?) -> List<Entry>
+
+    Logic: Semantic search + Keyword boost + Tag filtering.
+
+3. forget(id: Int)
+
+    Logic: Deterministic deletion by ID. Reject "semantic deletion" to avoid accidental data loss.
+
+4. list_memories(limit: Int, offset: Int) -> List<EntryMetadata>
+
+    Logic: Provide visibility into the system state. Essential for debugging and manual cleanup.
+
+5. get_stats() -> Object
+
+    Logic: Return count of entries and last update timestamp. Enables the Host to assess the "weight" of the memory.
+
+### 3.4 Communication: Streamable HTTP (NDJSON)
 
 Framing: Every response message must be a single-line JSON object followed by a newline character (\n).
 
@@ -45,7 +69,7 @@ The Pipe: Use Ktor's respondBytesWriter to maintain a persistent connection for 
 
 Heartbeat: Implement a 30-second keep-alive pulse (empty JSON {}) to prevent NAT timeout on mobile networks.
 
-### 3.4 Android Lifecycle Management
+### 3.5 Android Lifecycle Management
 
 Foreground Service: The MCP server must run as a Foreground Service with a visible notification. This is non-negotiable to prevent the "Tombstone" state.
 

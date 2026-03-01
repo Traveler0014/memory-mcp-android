@@ -6,7 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 
-@Database(entities = [MemoryEntry::class], version = 1, exportSchema = false)
+@Database(entities = [MemoryEntry::class], version = 2, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class MemoryDatabase : RoomDatabase() {
     abstract fun memoryDao(): MemoryDao
@@ -23,6 +23,7 @@ abstract class MemoryDatabase : RoomDatabase() {
                     "memory_database"
                 )
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
+                .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
                 instance

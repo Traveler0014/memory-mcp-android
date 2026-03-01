@@ -1,4 +1,6 @@
 .cache
+app/build
+.gradle
 
 # Compiled class file
 *.class

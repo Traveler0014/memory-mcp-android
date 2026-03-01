@@ -5,23 +5,28 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.util.Log
 
-class NSDHelper(context: Context, private val port: Int) {
+class NSDHelper(
+    context: Context, 
+    private val port: Int,
+    private val serviceName: String = "MemoryMCP"
+) {
 
     private val nsdManager: NsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
     private var registrationListener: NsdManager.RegistrationListener? = null
-    private val serviceName = "MemoryMCP"
-    private val serviceType = "_mcp-streamable._tcp." // standard Android NSD requires the dot sometimes depending on API, but generally local is appended
+    private val serviceType = "_mcp._tcp" 
 
     fun registerService() {
         val serviceInfo = NsdServiceInfo().apply {
             this.serviceName = this@NSDHelper.serviceName
             this.serviceType = this@NSDHelper.serviceType
             this.port = this@NSDHelper.port
+            // Add metadata for MCP clients
+            this.setAttribute("path", "/mcp")
         }
 
         registrationListener = object : NsdManager.RegistrationListener {
-            override fun onServiceRegistered(NsdServiceInfo: NsdServiceInfo) {
-                Log.d("NSDHelper", "Service registered: ${NsdServiceInfo.serviceName}")
+            override fun onServiceRegistered(registeredInfo: NsdServiceInfo) {
+                Log.d("NSDHelper", "Service registered: ${registeredInfo.serviceName}")
             }
 
             override fun onRegistrationFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {

@@ -1,6 +1,5 @@
 package me.travon.memory.inference
 
-import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
@@ -14,50 +13,71 @@ class EmbeddingEngine(private val context: Context) {
 
     private var environment: OrtEnvironment? = null
     private var session: OrtSession? = null
-    private var tokenizer: HuggingFaceTokenizer? = null
+    private var tokenizer: BertTokenizer? = null
 
-    init {
-        // Initialization can be called proactively
-    }
+    @get:Synchronized
+    var isInitialized: Boolean = false
+        private set
 
-    fun initialize() {
-        if (environment != null && session != null && tokenizer != null) return
+    suspend fun initialize() = withContext(Dispatchers.IO) {
+        if (isInitialized) return@withContext
 
-        environment = OrtEnvironment.getEnvironment()
-        val options = OrtSession.SessionOptions().apply {
-            setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
-        }
-        
-        val modelBytes = context.assets.open("model_quantized.onnx").readBytes()
-        if (modelBytes.isNotEmpty()) {
-            session = environment?.createSession(modelBytes, options)
-        }
+        try {
+            environment = OrtEnvironment.getEnvironment()
+            val options = OrtSession.SessionOptions().apply {
+                setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
+            }
+            
+            // Copy model files from assets to internal storage so ONNX Runtime
+            // can locate the external data file (model_quantized.onnx_data)
+            val modelDir = java.io.File(context.filesDir, "model")
+            modelDir.mkdirs()
+            
+            val modelFile = java.io.File(modelDir, "model_quantized.onnx")
+            val dataFile = java.io.File(modelDir, "model_quantized.onnx_data")
+            
+            if (!modelFile.exists()) {
+                context.assets.open("model_quantized.onnx").use { input ->
+                    modelFile.outputStream().use { output -> input.copyTo(output) }
+                }
+            }
+            if (!dataFile.exists()) {
+                context.assets.open("model_quantized.onnx_data").use { input ->
+                    dataFile.outputStream().use { output -> input.copyTo(output) }
+                }
+            }
+            
+            session = environment?.createSession(modelFile.absolutePath, options)
 
-        context.assets.open("tokenizer.json").use { inputStream ->
-            tokenizer = HuggingFaceTokenizer.newInstance(inputStream, mapOf("padding" to "true", "truncation" to "true", "maxLength" to "512"))
+            // Pure Kotlin tokenizer — no native libs needed
+            tokenizer = BertTokenizer(context)
+            isInitialized = true
+        } catch (e: Exception) {
+            android.util.Log.e("EmbeddingEngine", "Failed to initialize: ${e.message}", e)
+            throw e
         }
     }
 
     suspend fun getEmbedding(text: String): FloatArray = withContext(Dispatchers.Default) {
-        val env = environment ?: throw IllegalStateException("Environment not initialized")
-        val sess = session ?: throw IllegalStateException("Session not initialized")
-        val tok = tokenizer ?: throw IllegalStateException("Tokenizer not initialized")
+        if (!isInitialized) {
+            initialize()
+        }
+        
+        val env = environment!!
+        val sess = session!!
+        val tok = tokenizer!!
 
         // Preprocessing: trim and remove newlines
         val normalizedText = text.trim().replace("\\s+".toRegex(), " ")
 
         val encoding = tok.encode(normalizedText)
-        val tokenIds = encoding.ids
-        val attentionMask = encoding.attentionMask
-        val tokenTypeIds = encoding.typeIds
 
-        val shape = longArrayOf(1, tokenIds.size.toLong())
+        val shape = longArrayOf(1, encoding.inputIds.size.toLong())
         
-        val inputIdTensor = OnnxTensor.createTensor(env, LongBuffer.wrap(tokenIds), shape)
-        val maskTensor = OnnxTensor.createTensor(env, LongBuffer.wrap(attentionMask), shape)
-        val typeIdTensor = OnnxTensor.createTensor(env, LongBuffer.wrap(tokenTypeIds), shape)
+        val inputIdTensor = OnnxTensor.createTensor(env, LongBuffer.wrap(encoding.inputIds), shape)
+        val maskTensor = OnnxTensor.createTensor(env, LongBuffer.wrap(encoding.attentionMask), shape)
+        val typeIdTensor = OnnxTensor.createTensor(env, LongBuffer.wrap(encoding.tokenTypeIds), shape)
 
-        // The inputs depend on the exact ONNX export. Usually bge-small requires these.
         val inputs = mapOf(
             "input_ids" to inputIdTensor,
             "attention_mask" to maskTensor,
@@ -67,8 +87,8 @@ class EmbeddingEngine(private val context: Context) {
         try {
             val result = sess.run(inputs)
             
-            // Depending on the export, it might be the cls token (index 0) of the last_hidden_state
-            // Let's assume the standard pooling: sentence embedding is the 0-th token output
+            // Output shape: [1, seq_len, hidden_size] — take CLS token (index 0)
+            @Suppress("UNCHECKED_CAST")
             val outputTensor = result[0].value as Array<Array<FloatArray>>
             val embedding = outputTensor[0][0]
 
@@ -96,7 +116,6 @@ class EmbeddingEngine(private val context: Context) {
 
     fun cosineSimilarity(v1: FloatArray, v2: FloatArray): Float {
         require(v1.size == v2.size) { "Vectors must have the same dimension" }
-        // Since embeddings are normalized, dot product = cosine similarity
         var dot = 0f
         for (i in v1.indices) {
             dot += v1[i] * v2[i]
@@ -107,6 +126,5 @@ class EmbeddingEngine(private val context: Context) {
     fun close() {
         session?.close()
         environment?.close()
-        tokenizer?.close()
     }
 }
