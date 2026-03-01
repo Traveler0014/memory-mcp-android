@@ -64,7 +64,7 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
-    implementation("com.microsoft.onnxruntime:onnxruntime-mobile:1.16.3")
+    implementation("com.microsoft.onnxruntime:onnxruntime:1.16.3")
     implementation("ai.djl.huggingface:tokenizers:0.26.0")
 
     testImplementation("junit:junit:4.13.2")
